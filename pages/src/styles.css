@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Mohave, Roboto, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+
+  background: transparent;
+  overflow: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  background-image: url("/tamago.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  animation: 180s infinite ease-in-out spin;
+}
+
+input, select, textarea, button{font-family:inherit;}
+
+@keyframes spin {
+  0% {
+    transform: rotate(30deg);
+  }
+  50% {
+    transform: rotate(-30deg);
+  }
+  100% {
+    transform: rotate(30deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+  }
+}
+
+.loader path {
+  fill: black;
+}
+
+@media (prefers-color-scheme: dark) {
+  .loader path {
+    fill: white;
+  }
+}
