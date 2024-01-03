@@ -160,7 +160,7 @@ export const logAttendance = onCall(
                 {
                     type: "paragraph",
                     paragraph: text(
-                        "Attendance logged via https://sushisquad.org/attendance"
+                        "Attendance logged via https://sushisquad.org/sushi-squad-attendance"
                     ),
                 },
             ];
