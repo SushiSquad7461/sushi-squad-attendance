@@ -30,7 +30,7 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v2
       - name: Install Dependencies
-        run:  cd pages && yarn install --force
+        run:  ls && cd pages && yarn install --force
       - name: Build with Vite
         run:  yarn build
       - name: Upload artifact
