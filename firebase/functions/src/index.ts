@@ -186,7 +186,7 @@ export const logAttendance = onCall(
                 });
             }
 
-            const page = await NotionClient.createSimplePageInDatabase(
+            await NotionClient.createSimplePageInDatabase(
                 process.env.NOTION_ATTENDANCE_DBID,
                 "Title",
                 `${user.name} ${pacificDateStr(now)}`,
