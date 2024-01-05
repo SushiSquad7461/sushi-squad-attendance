@@ -1,4 +1,4 @@
-import {Client} from "@notionhq/client";
+import { Client } from "@notionhq/client";
 import type {
     BlockObjectRequest,
     CreatePageParameters,
@@ -40,7 +40,7 @@ class NotionClient {
             filter: {
                 property: "Date",
                 date: {
-                    equals: date.toISOString().split("T")[0],
+                    equals: pacificDateStr(date),
                 },
             },
         });
@@ -85,7 +85,7 @@ class NotionClient {
     }
 
     /**
-     * Create a page in the database specified with a title, date, and 
+     * Create a page in the database specified with a title, date, and
      * optionally children
      *
      * @param dbid The database to create the page in
@@ -122,34 +122,65 @@ class NotionClient {
             ],
         };
         return await NotionClient.client.pages.create(params);
-    } 
-    
+    }
 }
 
 /**
- * Get the current date in the Pacific timezone as a string
- * @param date 
- * @returns Date in the format MM/DD/YY
+ * Get the current date in the Pacific timezone as a string. Use
+ * this for display purposes.
+ * @param date
+ * @returns Date in the format MM/DD/YY (2-digit) or MM/DD/YYYY (default/numeric)
  */
-function pacificDateStr(date: Date) {
-    return date.toLocaleDateString(
-        "en-US",
-        {
-            month: "numeric",
-            day: "numeric",
-            year: "2-digit",
-            timeZone: "America/Los_Angeles",
-        }
-    );
+export function pacificLocaleDateStr(date: Date) {
+    return date.toLocaleDateString("en-US", {
+        month: "numeric",
+        day: "numeric",
+        year: "2-digit",
+        timeZone: "America/Los_Angeles",
+    });
 }
 
+export function dateFromPacificDateStr(dateStr: string) {
+    const dateTimeStr = `${dateStr}T00:00:00-08:00`;
+    return new Date(dateTimeStr);
+}
+
+/**
+ *
+ * @param date
+ * @returns
+ */
+export function pacificWeekdayStr(date: Date) {
+    return date.toLocaleDateString("en-US", {
+        weekday: "long",
+        timeZone: "America/Los_Angeles",
+    });
+}
+
+/**
+ * Returns ISO 8601 pacific date string in the YYYY-MM-DD format Notion expects.
+ * @param date
+ * @returns
+ */
+export function pacificDateStr(date: Date) {
+    const [month, day, year] = date
+        .toLocaleDateString("en-US", {
+            month: "numeric",
+            day: "numeric",
+            year: "numeric",
+            timeZone: "America/Los_Angeles",
+        })
+        .split("/");
+    return `${year}-${month}-${day}`;
+    // return date.toISOString().split("T")[0];
+}
 
 /**
  * Get text in the format Notion expects
- * @param text 
- * @returns 
+ * @param text
+ * @returns
  */
-function text(text: string) {
+export function text(text: string) {
     return {
         rich_text: [
             {
@@ -160,7 +191,5 @@ function text(text: string) {
         ],
     };
 }
-
-export {pacificDateStr, text};
 
 export default NotionClient;
