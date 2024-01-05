@@ -53,11 +53,10 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v3
-    - name: Get functions submodule, install its packages, and build it
+    - name: Install dependencies and setup environment variables
       run: |
         cd firebase/functions
         yarn install
-        yarn build
         echo "
         NOTION_TOKEN=${{secrets.NOTION_TOKEN}}
         NOTION_BOT_USER_ID=${{secrets.NOTION_BOT_USER_ID}}
