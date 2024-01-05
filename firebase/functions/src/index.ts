@@ -210,7 +210,6 @@ export const logAttendance = onCall(
                 },
                 children
             );
-            logger.debug("Attendance logged", page);
         } catch (err) {
             logger.error(err);
             throw new HttpsError("internal", "Error logging attendance", err);
@@ -241,6 +240,7 @@ const doc = new GoogleSpreadsheet(
 
 // AppEngine schedule syntax https://cloud.google.com/appengine/docs/flexible/scheduling-jobs-with-cron-yaml
 export const exportAttendance = onSchedule("every sunday 5:00", async () => {
+    logger.debug("Exporting attendance");
     const now = new Date();
     const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const newSheet = await doc.addSheet({
