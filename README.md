@@ -37,6 +37,7 @@ Requirements
         - Title - Title field
         - Person - Person field with a limit of 1
         - Engineering Notebook - Relation to Engineering Notebook with a limit of 1
+        - Date Created - Create time field 
     - Integration
         - Create an integration
         - Get its key/token

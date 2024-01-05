@@ -2,12 +2,11 @@ import {
     BlockObjectRequest,
     PageObjectResponse,
     PersonUserObjectResponse,
-    QueryDatabaseParameters,
 } from "@notionhq/client/build/src/api-endpoints";
 import NotionClient, { PropertyFilter, text } from "../util/notion-client";
 import { pacificDateStr } from "../util/datetime";
 import { Database, Model } from "./model";
-import Meetings, { type Meeting } from "./meeting";
+import type { Meeting } from "./meeting";
 
 class Attendance implements Model {
     public readonly id: string;
@@ -140,7 +139,7 @@ const Attendances: Database<
         }
         if (onOrAfter) {
             filters.push({
-                property: "Date",
+                property: "Date Created",
                 date: {
                     on_or_after: pacificDateStr(onOrAfter),
                 },
