@@ -103,18 +103,7 @@ export const logAttendance = onCall(
         });
         const minutes = minutesFromTime(time);
 
-        const validMeetingTime = validMeetingTimes.find(
-            (t) =>
-                t.day === day &&
-                t.start - VALID_MEETING_TIME_EPSILON <= minutes &&
-                minutes <= t.end + VALID_MEETING_TIME_EPSILON
-        );
-        if (!validMeetingTime) {
-            throw new HttpsError(
-                "deadline-exceeded",
-                "No meeting to attend at this time"
-            );
-        }
+        const validMeetingDay = validMeetingTimes.find((t) => t.day === day);
 
         // check if meeting doesn't exist
         let meeting = await NotionClient.queryDatabaseForDate(
@@ -123,6 +112,15 @@ export const logAttendance = onCall(
         );
 
         if (!meeting || meeting.object !== "page") {
+            // if no meeting exists and it's not a prescheduled
+            // meeting time, throw an error
+            if (!validMeetingDay) {
+                throw new HttpsError(
+                    "deadline-exceeded",
+                    "No meeting to attend at this time"
+                );
+            }
+
             // if it doesn't exist, create it
             meeting = await NotionClient.createSimplePageInDatabase(
                 process.env.NOTION_MEETINGS_DBID,
@@ -139,6 +137,23 @@ export const logAttendance = onCall(
                 }
             );
         } else {
+            // if it does exist, check if it's a prescheduled meeting time
+            if (validMeetingDay) {
+                // if it is, check that we are within the
+                // valid meeting time epsilon
+                const validMeetingTime =
+                    validMeetingDay.start - VALID_MEETING_TIME_EPSILON <=
+                        minutes &&
+                    minutes <= validMeetingDay.end + VALID_MEETING_TIME_EPSILON;
+
+                if (!validMeetingTime) {
+                    throw new HttpsError(
+                        "deadline-exceeded",
+                        "No meeting to attend at this time"
+                    );
+                }
+            }
+
             // if it does exist, check if user already has an entry
             const attendance = await NotionClient.queryDatabase(
                 process.env.NOTION_ATTENDANCE_DBID,
