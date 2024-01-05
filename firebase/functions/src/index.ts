@@ -158,7 +158,7 @@ export const logAttendance = onCall(
             const attendance = await NotionClient.queryDatabase(
                 process.env.NOTION_ATTENDANCE_DBID,
                 {
-                    property: "Meetings",
+                    property: "Engineering Notebook",
                     relation: {
                         contains: meeting.id,
                     },
@@ -214,7 +214,7 @@ export const logAttendance = onCall(
                             },
                         ],
                     },
-                    Meetings: {
+                    "Engineering Notebook": {
                         type: "relation",
                         relation: [
                             {
@@ -318,7 +318,7 @@ export const exportAttendance = onSchedule("every sunday 5:00", async () => {
             },
         },
         {
-            property: "Meetings",
+            property: "Engineering Notebook",
             relation: {
                 is_not_empty: true,
             },
@@ -346,7 +346,7 @@ export const exportAttendance = onSchedule("every sunday 5:00", async () => {
             continue;
 
         const person = peopleProp.people[0] as UserObjectResponse;
-        const meetingsProp = page.properties.Meetings;
+        const meetingsProp = page.properties["Engineering Notebook"];
         if (
             person.type !== "person" ||
             meetingsProp.type !== "relation" ||
