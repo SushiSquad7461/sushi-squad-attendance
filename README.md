@@ -7,6 +7,7 @@ Recommended to set prettier to format on save
 ## Behavior
 
 - Allows attendance to be logged from the website or from Notion directly.
+    - For the purposes of counting attendance requirements, a meeting did not happen if there are no associated attendance logs, meaning it would not count against attendance requirements
 - Attendance reports will be generated and sent to a Google spreadsheet every Sunday at 5:00 AM.
 - When using the website
     - On regularly scheduled meeting days (hard coded), it will only allow the user to submit attendance during the meeting (or shortly before and after)
