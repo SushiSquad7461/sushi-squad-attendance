@@ -10,31 +10,19 @@
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
-import emailRegex from "./email-regex";
-import NotionClient, {
-    dateFromPacificDateStr,
+import emailRegex from "./util/email-regex";
+import NotionClient from "./util/notion-client";
+import {
     pacificDateStr,
     pacificWeekdayStr,
     pacificLocaleDateStr,
-    text,
-} from "./notion-client";
-import {
-    BlockObjectRequest,
-    PageObjectResponse,
-    UserObjectResponse,
-} from "@notionhq/client/build/src/api-endpoints";
+    minutesFromTime,
+} from "./util/datetime";
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
-import { gradientRule, updateDimension } from "./google-sheets";
-
-const minutesFromTime = (time: string): number => {
-    const [hours, minutes] = time.split(":").map((s) => parseInt(s));
-    return hours * 60 + minutes;
-};
-
-/** 75% attendance target */
-const ATTENDANCE_TARGET = 0.75;
-const ATTENDANCE_MINIMUM = 0.5;
+import { gradientRule, updateDimension } from "./util/google-sheets";
+import Meetings, { getMeetingByDate } from "./models/meeting";
+import Attendances from "./models/attendance";
 
 /** Days of the week and times that are valid meetings */
 const validMeetingTimes = [
@@ -62,6 +50,10 @@ const validMeetingTimes = [
 
 /** can submit attendance log 30 minutes before or after the meeting */
 const VALID_MEETING_TIME_EPSILON = 30; // minutes
+
+/** 75% attendance target */
+const ATTENDANCE_TARGET = 0.75;
+const ATTENDANCE_MINIMUM = 0.5;
 
 export const logAttendance = onCall(
     { cors: ["https://localhost:5173", "https://sushisquad.org"] },
@@ -106,12 +98,9 @@ export const logAttendance = onCall(
         const validMeetingDay = validMeetingTimes.find((t) => t.day === day);
 
         // check if meeting doesn't exist
-        let meeting = await NotionClient.queryDatabaseForDate(
-            process.env.NOTION_MEETINGS_DBID,
-            now
-        );
+        let meeting = await getMeetingByDate(now);
 
-        if (!meeting || meeting.object !== "page") {
+        if (!meeting) {
             // if no meeting exists and it's not a prescheduled
             // meeting time, throw an error
             if (!validMeetingDay) {
@@ -122,20 +111,7 @@ export const logAttendance = onCall(
             }
 
             // if it doesn't exist, create it
-            meeting = await NotionClient.createSimplePageInDatabase(
-                process.env.NOTION_MEETINGS_DBID,
-                "Name",
-                `${pacificDateStr(now)}`,
-                {
-                    Date: {
-                        type: "date",
-                        date: {
-                            start: pacificDateStr(now),
-                            time_zone: "America/Los_Angeles",
-                        },
-                    },
-                }
-            );
+            meeting = await Meetings.create({ date: now });
         } else {
             // if it does exist, check if it's a prescheduled meeting time
             if (validMeetingDay) {
@@ -155,24 +131,12 @@ export const logAttendance = onCall(
             }
 
             // if it does exist, check if user already has an entry
-            const attendance = await NotionClient.queryDatabase(
-                process.env.NOTION_ATTENDANCE_DBID,
-                {
-                    property: "Engineering Notebook",
-                    relation: {
-                        contains: meeting.id,
-                    },
-                },
-                {
-                    property: "Person",
-                    type: "people",
-                    people: {
-                        contains: user.id,
-                    },
-                }
-            );
+            const attendance = await Attendances.query({
+                meetingId: meeting.id,
+                userId: user.id,
+            });
 
-            if (attendance) {
+            if (attendance.length) {
                 throw new HttpsError(
                     "already-exists",
                     "Already logged attendance"
@@ -182,49 +146,11 @@ export const logAttendance = onCall(
 
         // log user's attendance
         try {
-            const children: BlockObjectRequest[] = [
-                {
-                    type: "paragraph",
-                    paragraph: text(
-                        "Attendance logged via https://sushisquad.org/sushi-squad-attendance"
-                    ),
-                },
-            ];
-            if (parsedDescription) {
-                children.push({
-                    type: "heading_2",
-                    heading_2: text("Description"),
-                });
-                children.push({
-                    type: "paragraph",
-                    paragraph: text(parsedDescription),
-                });
-            }
-
-            await NotionClient.createSimplePageInDatabase(
-                process.env.NOTION_ATTENDANCE_DBID,
-                "Title",
-                `${user.name} ${pacificDateStr(now)}`,
-                {
-                    Person: {
-                        type: "people",
-                        people: [
-                            {
-                                id: user.id,
-                            },
-                        ],
-                    },
-                    "Engineering Notebook": {
-                        type: "relation",
-                        relation: [
-                            {
-                                id: meeting.id,
-                            },
-                        ],
-                    },
-                },
-                children
-            );
+            await Attendances.create({
+                user,
+                meeting,
+                description: parsedDescription,
+            });
         } catch (err) {
             logger.error(err);
             throw new HttpsError("internal", "Error logging attendance", err);
@@ -271,30 +197,12 @@ export const exportAttendance = onSchedule("every sunday 5:00", async () => {
     logger.info("New sheet created", newSheet.sheetId);
 
     // get all meetings from last week (in case a meeting is cancelled)
-    const meetingsResponse = await NotionClient.queryAllDatabase(
-        process.env.NOTION_MEETINGS_DBID,
-        {
-            property: "Date",
-            date: {
-                on_or_after: pacificDateStr(lastWeek),
-            },
-        }
-    );
+    const meetingsResponse = await Meetings.query({ onOrAfter: lastWeek });
     const meetings: { id: string; day: Date; meetingLength: number }[] = [];
     let maxHours = 0;
     meetingsResponse.forEach((meeting) => {
-        if (meeting.object !== "page") return;
-        if (!(meeting as PageObjectResponse).properties) return;
-        const m = meeting as PageObjectResponse;
-
-        if (!m.properties.Date || m.properties.Date.type !== "date") return;
-        if (!m.properties.Date.date?.start) return;
-        // will already be in pacific date str format
-        const day = dateFromPacificDateStr(m.properties.Date.date.start);
-        logger.info(`Found meeting on ${m.properties.Date.date.start}`);
-
         const meetingInfo = validMeetingTimes.find(
-            (t) => t.day === pacificWeekdayStr(day)
+            (t) => t.day === pacificWeekdayStr(meeting.date)
         );
         if (!meetingInfo) return;
 
@@ -303,63 +211,24 @@ export const exportAttendance = onSchedule("every sunday 5:00", async () => {
         meetings.push({
             id: meeting.id,
             meetingLength,
-            day,
+            day: meeting.date,
         });
         maxHours += meetingLength;
     });
 
     // get all attendance logs from last week
-    const attendance = await NotionClient.queryAllDatabase(
-        process.env.NOTION_ATTENDANCE_DBID,
-        {
-            property: "Created time",
-            date: {
-                on_or_after: pacificDateStr(lastWeek), // need to add an additional condition if want to be able to use this for backfill
-            },
-        },
-        {
-            property: "Engineering Notebook",
-            relation: {
-                is_not_empty: true,
-            },
-        }
-        // uncomment this to ignore attendance logs that are created manually
-        // {
-        //     property: "Created by",
-        //     people: {
-        //         contains: process.env.NOTION_BOT_USER_ID,
-        //     },
-        // }
-    );
+    const attendance = await Attendances.query({ onOrAfter: lastWeek });
 
     const weekRows: Record<string, string | number>[] = [];
     const aggregateRows: Record<string, string | number>[] = [];
     const people = new Map<string, string>(); // email -> name
     for (const entry of attendance) {
-        const page = entry as PageObjectResponse;
-        const peopleProp = page.properties.Person;
-        if (
-            !peopleProp ||
-            peopleProp.type !== "people" ||
-            !peopleProp.people.length
-        )
-            continue;
-
-        const person = peopleProp.people[0] as UserObjectResponse;
-        const meetingsProp = page.properties["Engineering Notebook"];
-        if (
-            person.type !== "person" ||
-            meetingsProp.type !== "relation" ||
-            !meetingsProp.relation.length
-        )
-            continue;
-
-        const name = person.name;
-        const email = person.person.email;
+        const name = entry.user.name;
+        const email = entry.user.person.email;
         if (!name || !email) continue;
-        const meeting = meetings.find(
-            (m) => m.id === meetingsProp.relation[0].id
-        );
+
+        // find the meeting this entry is for
+        const meeting = meetings.find((m) => m.id === entry.meetingId);
         if (!meeting) continue;
 
         const day = pacificDateStr(meeting.day);
