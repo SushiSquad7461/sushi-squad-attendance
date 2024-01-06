@@ -49,6 +49,8 @@ export function pacificDateStr(date: Date) {
             timeZone: "America/Los_Angeles",
         })
         .split("/");
-    return `${year}-${month}-${day}`;
+    return `${year}-${new String(month).padStart(2, "0")}-${new String(
+        day
+    ).padStart(2, "0")}`;
     // return date.toISOString().split("T")[0];
 }

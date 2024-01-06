@@ -11,7 +11,6 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
 import emailRegex from "./util/email-regex";
-import NotionClient from "./util/notion-client";
 import {
     pacificDateStr,
     pacificWeekdayStr,
@@ -23,6 +22,7 @@ import { JWT } from "google-auth-library";
 import { gradientRule, updateDimension } from "./util/google-sheets";
 import Meetings, { getMeetingByDate } from "./models/meeting";
 import Attendances from "./models/attendance";
+import Users from "./models/user";
 
 /** Days of the week and times that are valid meetings */
 const validMeetingTimes = [
@@ -71,7 +71,7 @@ export const logAttendance = onCall(
             throw new HttpsError("invalid-argument", "Invalid email");
         }
 
-        const user = await NotionClient.findUser(trimmedEmail);
+        const user = (await Users.query({ email: trimmedEmail }))[0];
         if (!user) {
             throw new HttpsError(
                 "invalid-argument",
@@ -224,7 +224,7 @@ export const exportAttendance = onSchedule("every sunday 5:00", async () => {
     const people = new Map<string, string>(); // email -> name
     for (const entry of attendance) {
         const name = entry.user.name;
-        const email = entry.user.person.email;
+        const email = entry.user.email;
         if (!name || !email) continue;
 
         // find the meeting this entry is for

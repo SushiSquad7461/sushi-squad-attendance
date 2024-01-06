@@ -4,6 +4,7 @@ import type {
     CreatePageParameters,
     PersonUserObjectResponse,
     QueryDatabaseParameters,
+    UserObjectResponse,
 } from "@notionhq/client/build/src/api-endpoints";
 import { pacificDateStr } from "./datetime";
 
@@ -17,6 +18,18 @@ class NotionClient {
         auth: process.env.NOTION_TOKEN,
     });
 
+    public static async allUsers() {
+        let response = await NotionClient.client.users.list({});
+        const users = response.results;
+        while (response.has_more && response.next_cursor) {
+            response = await NotionClient.client.users.list({
+                start_cursor: response.next_cursor,
+            });
+            users.push(...response.results);
+        }
+        return users;
+    }
+
     /**
      * Finds a user in the Notion workspace
      *
@@ -24,12 +37,19 @@ class NotionClient {
      *
      * @return the user or undefined if not found
      */
-    public static async findUser(email: string) {
-        const notionUsers = await NotionClient.client.users.list({});
-        const user = notionUsers.results.find(
+    public static async findUser(
+        email: string,
+        usersCache?: UserObjectResponse[]
+    ) {
+        const notionUsers = usersCache ?? (await NotionClient.allUsers());
+        const user = notionUsers.find(
             (u) => u.type === "person" && u.person.email === email
         ) as PersonUserObjectResponse | undefined;
         return user;
+    }
+
+    public static findUserById(id: string) {
+        return NotionClient.client.users.retrieve({ user_id: id });
     }
 
     public static async getPageById(id: string) {

@@ -4,13 +4,14 @@ import {
     PersonUserObjectResponse,
 } from "@notionhq/client/build/src/api-endpoints";
 import NotionClient, { PropertyFilter, text } from "../util/notion-client";
-import { pacificDateStr } from "../util/datetime";
+import { pacificDateStr, pacificLocaleDateStr } from "../util/datetime";
 import { Database, Model } from "./model";
 import type { Meeting } from "./meeting";
+import { User } from "./user";
 
 class Attendance implements Model {
     public readonly id: string;
-    public readonly user: PersonUserObjectResponse;
+    public readonly user: User;
     public readonly meetingId: string;
 
     constructor(attendanceResponse: PageObjectResponse) {
@@ -36,7 +37,7 @@ class Attendance implements Model {
             throw new Error("Attendance meeting is not a relation");
 
         this.id = attendanceResponse.id;
-        this.user = person;
+        this.user = new User(person);
         this.meetingId =
             attendanceResponse.properties[
                 "Engineering Notebook"
@@ -48,7 +49,7 @@ export type { Attendance };
 
 const Attendances: Database<
     Attendance,
-    { user: PersonUserObjectResponse; meeting: Meeting; description?: string },
+    { user: User; meeting: Meeting; description?: string },
     {
         userId?: string;
         meetingId?: string;
@@ -78,7 +79,7 @@ const Attendances: Database<
         const reponse = await NotionClient.createSimplePageInDatabase(
             process.env.NOTION_ATTENDANCE_DBID,
             "Title",
-            `${user.name} ${pacificDateStr(meeting.date)}`,
+            `${user.name ?? "Unnamed"} ${pacificLocaleDateStr(meeting.date)}`,
             {
                 Person: {
                     type: "people",

@@ -1,6 +1,10 @@
 import { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 import NotionClient from "../util/notion-client";
-import { dateFromPacificDateStr, pacificDateStr } from "../util/datetime";
+import {
+    dateFromPacificDateStr,
+    pacificDateStr,
+    pacificLocaleDateStr,
+} from "../util/datetime";
 import { Database, Model } from "./model";
 
 class Meeting implements Model {
@@ -28,13 +32,12 @@ const Meetings: Database<Meeting, { date: Date }, { onOrAfter: Date }> = {
         const response = await NotionClient.createSimplePageInDatabase(
             process.env.NOTION_MEETINGS_DBID,
             "Name",
-            `${pacificDateStr(date)}`,
+            `${pacificLocaleDateStr(date)}`,
             {
                 Date: {
                     type: "date",
                     date: {
                         start: pacificDateStr(date),
-                        time_zone: "America/Los_Angeles",
                     },
                 },
             }
