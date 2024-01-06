@@ -203,7 +203,7 @@ export const exportAttendance = onSchedule("every sunday 5:00", async () => {
     meetingsResponse.forEach((meeting) => {
         const meetingInfo = validMeetingTimes.find(
             (t) => t.day === pacificWeekdayStr(meeting.date)
-        );
+        ) ?? { start: 0, end: 180 };
         if (!meetingInfo) return;
 
         const meetingLength = (meetingInfo.end - meetingInfo.start) / 60; // hours

@@ -10,6 +10,7 @@ This is the repository for the Sushi Squad Attendance system which attempts to a
 - When using the website
     - On regularly scheduled meeting days (hard coded), it will only allow the user to submit attendance during the meeting (or shortly before and after)
     - On days where there is no regularly scheduled meeting, submission will be blocked unless there is a pre-existing meeting for that day in the Notion Engineering Notebook
+    - If a meeting is created for a non regularly scheduled meeting day, attendance logs for that day will use a default meeting length of 3 hours
     - On regularly scheduled meeting days, upon a valid attendance submission request, the program will create a meeting in Notion if one does not exist (or exists without the correct date)
 - When using Notion
     - The meeting should have a date assigned
