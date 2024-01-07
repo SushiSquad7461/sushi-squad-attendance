@@ -65,7 +65,7 @@ jobs:
         GOOGLE_ATTENDANCE_SHEET_ID=${{secrets.GOOGLE_ATTENDANCE_SHEET_ID}}
         GOOGLE_ATTENDANCE_AGGREGATE_WORKSHEET_ID=${{secrets.GOOGLE_ATTENDANCE_AGGREGATE_WORKSHEET_ID}}
         GOOGLE_SERVICE_ACCOUNT_EMAIL=${{secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL}}
-        GOOGLE_PRIVATE_KEY=${{secrets.GOOGLE_PRIVATE_KEY}}" >> .env
+        GOOGLE_PRIVATE_KEY=\"${{secrets.GOOGLE_PRIVATE_KEY}}\"" >> .env
     # Deploying the functions to firebase
     - name:  Deploy to Firebase
       uses: w9jds/firebase-action@master
