@@ -16,10 +16,15 @@ import {
     pacificWeekdayStr,
     pacificLocaleDateStr,
     minutesFromTime,
+    ONE_DAY_MS,
 } from "./util/datetime";
 import { GoogleSpreadsheet } from "google-spreadsheet";
 import { JWT } from "google-auth-library";
-import { gradientRule, updateDimension } from "./util/google-sheets";
+import {
+    basicFilterView,
+    gradientRule,
+    updateDimension,
+} from "./util/google-sheets";
 import Meetings, { getMeetingByDate } from "./models/meeting";
 import Attendances from "./models/attendance";
 import Users from "./models/user";
@@ -180,188 +185,211 @@ const doc = new GoogleSpreadsheet(
 );
 
 // AppEngine schedule syntax https://cloud.google.com/appengine/docs/flexible/scheduling-jobs-with-cron-yaml
-export const exportAttendance = onSchedule("every sunday 5:00", async () => {
-    try {
-        logger.debug("Exporting attendance");
-        const now = new Date();
-        const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const newSheet = await doc.addSheet({
-            title: `${pacificLocaleDateStr(lastWeek)} - ${pacificLocaleDateStr(
-                now
-            )}`,
-        });
-        const aggregateSheet =
-            doc.sheetsById[
-                parseInt(process.env.GOOGLE_ATTENDANCE_AGGREGATE_WORKSHEET_ID)
-            ];
-
-        logger.info("New sheet created", newSheet.sheetId);
-
-        // get all meetings from last week (in case a meeting is cancelled)
-        const meetingsResponse = await Meetings.query({ onOrAfter: lastWeek });
-        const meetings: { id: string; day: Date; meetingLength: number }[] = [];
-        let maxHours = 0;
-        meetingsResponse.forEach((meeting) => {
-            const meetingInfo = validMeetingTimes.find(
-                (t) => t.day === pacificWeekdayStr(meeting.date)
-            ) ?? { start: 0, end: 180 };
-            if (!meetingInfo) return;
-
-            const meetingLength = (meetingInfo.end - meetingInfo.start) / 60; // hours
-
-            meetings.push({
-                id: meeting.id,
-                meetingLength,
-                day: meeting.date,
+export const exportAttendance = onSchedule(
+    "every sunday 5:00 America/Los_Angeles",
+    async () => {
+        try {
+            logger.debug("Exporting attendance");
+            const now = new Date();
+            const lastWeek = new Date(now.getTime() - 7 * ONE_DAY_MS);
+            const yesterday = new Date(now.valueOf() - ONE_DAY_MS);
+            const newSheet = await doc.addSheet({
+                title: `${pacificLocaleDateStr(
+                    lastWeek
+                )} - ${pacificLocaleDateStr(yesterday)}`,
             });
-            maxHours += meetingLength;
-        });
+            const aggregateSheet =
+                doc.sheetsById[
+                    parseInt(
+                        process.env.GOOGLE_ATTENDANCE_AGGREGATE_WORKSHEET_ID
+                    )
+                ];
 
-        // get all attendance logs from last week
-        const attendance = await Attendances.query({ onOrAfter: lastWeek });
+            logger.info("New sheet created", newSheet.sheetId);
 
-        const weekRows: Record<string, string | number>[] = [];
-        const aggregateRows: Record<string, string | number>[] = [];
-        const people = new Map<string, string>(); // email -> name
-        for (const entry of attendance) {
-            const name = entry.user.name;
-            const email = entry.user.email;
-            if (!name || !email) continue;
-
-            // find the meeting this entry is for
-            const meeting = meetings.find((m) => m.id === entry.meetingId);
-            if (!meeting) continue;
-
-            const day = pacificDateStr(meeting.day);
-            weekRows.push({
-                Email: email,
-                Day: day,
-                Hours: meeting.meetingLength,
+            // get all meetings from last week (in case a meeting is cancelled)
+            const meetingsResponse = await Meetings.query({
+                onOrAfter: lastWeek,
+                onOrBefore: yesterday,
             });
-            aggregateRows.push({
-                Name: name,
-                Email: email,
-                Day: day,
-                Hours: meeting.meetingLength,
+            const meetings: { id: string; day: Date; meetingLength: number }[] =
+                [];
+            let maxHours = 0;
+            meetingsResponse.forEach((meeting) => {
+                const meetingInfo = validMeetingTimes.find(
+                    (t) => t.day === pacificWeekdayStr(meeting.date)
+                ) ?? { start: 0, end: 180 };
+                if (!meetingInfo) return;
+
+                const meetingLength =
+                    (meetingInfo.end - meetingInfo.start) / 60; // hours
+
+                meetings.push({
+                    id: meeting.id,
+                    meetingLength,
+                    day: meeting.date,
+                });
+                maxHours += meetingLength;
             });
-            if (!people.has(email)) {
-                people.set(email, name);
+
+            // get all attendance logs from last week
+            const attendance = await Attendances.query({
+                onOrAfter: lastWeek,
+                onOrBefore: yesterday,
+            });
+
+            const weekRows: Record<string, string | number>[] = [];
+            const aggregateRows: Record<string, string | number>[] = [];
+            const people = new Map<
+                string,
+                { name: string; meetings: string[] }
+            >(); // email -> name
+            for (const entry of attendance) {
+                const name = entry.user.name;
+                const email = entry.user.email;
+                if (!name || !email) continue;
+
+                // find the meeting this entry is for
+                const meeting = meetings.find((m) => m.id === entry.meetingId);
+                if (!meeting) continue;
+
+                const day = pacificDateStr(meeting.day);
+
+                if (people.get(email)?.meetings.includes(meeting.id)) continue; // don't add duplicate entries
+
+                weekRows.push({
+                    Email: email,
+                    Day: day,
+                    Hours: meeting.meetingLength,
+                });
+                aggregateRows.push({
+                    Name: name,
+                    Email: email,
+                    Day: day,
+                    Hours: meeting.meetingLength,
+                });
+                if (people.has(email)) {
+                    people.get(email)?.meetings.push(meeting.id);
+                } else {
+                    people.set(email, { name, meetings: [meeting.id] });
+                }
             }
-        }
 
-        // don't include statistics in aggregate sheet, those will be setup manually
-        await aggregateSheet.addRows(aggregateRows, { insert: true });
+            // don't include statistics in aggregate sheet, those will be setup manually
+            await aggregateSheet.addRows(aggregateRows, { insert: true });
 
-        // create user statistics
-        let i = 0;
-        for (const [email, name] of people) {
-            weekRows[i].Name = name;
-            weekRows[i]["Notion Email"] = email;
-            // rows[i].Attendance = hours / maxHours;
-            i++;
-        }
-
-        // add rows to sheet
-        await newSheet.setHeaderRow([
-            "Email",
-            "Day",
-            "Hours",
-            "",
-            "Name",
-            "Notion Email",
-            "Attendance",
-        ]);
-        await newSheet.addRows(weekRows);
-
-        await newSheet.loadCells(`G1:G${i + 2}`);
-        for (let j = 0; j < i; j++) {
-            const cell = newSheet.getCellByA1(`G${j + 2}`);
-            cell.numberFormat = { type: "PERCENT", pattern: "0.0%" };
-            // A2:A is the range of emails, F2 is the email to match, C2:C is the range of attendance hours, J3 is the max hours
-            cell.formula = `=SUMIF(A2:A, F${j + 2}, C2:C) / J3`;
-        }
-
-        await newSheet.loadCells("I1:J4");
-        const i1 = newSheet.getCellByA1("I1");
-        i1.value = "Attendance Target";
-        const j1 = newSheet.getCellByA1("J1");
-        j1.value = ATTENDANCE_TARGET;
-        j1.numberFormat = { type: "PERCENT", pattern: "0%" };
-
-        const i2 = newSheet.getCellByA1("I2");
-        i2.value = "Minimum Attendance";
-        const j2 = newSheet.getCellByA1("J2");
-        j2.value = ATTENDANCE_MINIMUM;
-        j2.numberFormat = { type: "PERCENT", pattern: "0%" };
-
-        const i3 = newSheet.getCellByA1("I3");
-        i3.value = "Total Meeting Hours";
-        const j3 = newSheet.getCellByA1("J3");
-        j3.value = maxHours;
-
-        const i4 = newSheet.getCellByA1("I4");
-        i4.value = "Total Man Hours";
-        const j4 = newSheet.getCellByA1("J4");
-        j4.formula = "=SUM(C2:C)";
-
-        await newSheet.loadCells(`B2:B${weekRows.length + 2}`);
-        for (let i = 0; i < weekRows.length; i++) {
-            const cell = newSheet.getCellByA1(`B${i + 2}`);
-            cell.numberFormat = { type: "DATE", pattern: "M/D/YYYY" };
-        }
-        await newSheet.saveUpdatedCells();
-
-        await doc.sheetsApi.post(
-            `https://sheets.googleapis.com/v4/spreadsheets/${doc.spreadsheetId}:batchUpdate`,
-            {
-                requests: [
-                    gradientRule(
-                        newSheet.sheetId,
-                        {
-                            startRowIndex: 1,
-                            endRowIndex: i + 1,
-                            startColumnIndex: 6,
-                            endColumnIndex: 7,
-                        },
-                        {
-                            minpoint: {
-                                color: {
-                                    red: 0.78,
-                                    green: 0,
-                                    blue: 0.22,
-                                },
-                                type: "NUMBER",
-                                value: "0",
-                            },
-                            midpoint: {
-                                color: {
-                                    red: 1,
-                                    green: 0.76,
-                                },
-                                type: "NUMBER",
-                                value: "=J2",
-                            },
-                            maxpoint: {
-                                color: {
-                                    red: 0.18,
-                                    green: 0.8,
-                                    blue: 0.44,
-                                },
-                                type: "NUMBER",
-                                value: "=J1",
-                            },
-                        }
-                    ),
-                    updateDimension(newSheet.sheetId, "COLUMNS", 200, 0, 1),
-                    updateDimension(newSheet.sheetId, "COLUMNS", 200, 4, 6),
-                    updateDimension(newSheet.sheetId, "COLUMNS", 135, 8),
-                    updateDimension(newSheet.sheetId, "COLUMNS", 50, 9),
-                ],
+            // create user statistics
+            let i = 0;
+            for (const [email, { name }] of people) {
+                weekRows[i].Name = name;
+                weekRows[i]["Notion Email"] = email;
+                // rows[i].Attendance = hours / maxHours;
+                i++;
             }
-        );
 
-        logger.debug("Attendance exported successfully");
-    } catch (err) {
-        logger.error(err);
+            // add rows to sheet
+            await newSheet.setHeaderRow([
+                "Email",
+                "Day",
+                "Hours",
+                "",
+                "Name",
+                "Notion Email",
+                "Attendance",
+            ]);
+            await newSheet.addRows(weekRows);
+
+            await newSheet.loadCells(`G1:G${i + 2}`);
+            for (let j = 0; j < i; j++) {
+                const cell = newSheet.getCellByA1(`G${j + 2}`);
+                cell.numberFormat = { type: "PERCENT", pattern: "0.0%" };
+                // A2:A is the range of emails, F2 is the email to match, C2:C is the range of attendance hours, J3 is the max hours
+                cell.formula = `=SUMIF(A2:A, F${j + 2}, C2:C) / J3`;
+            }
+
+            await newSheet.loadCells("I1:J4");
+            const i1 = newSheet.getCellByA1("I1");
+            i1.value = "Attendance Target";
+            const j1 = newSheet.getCellByA1("J1");
+            j1.value = ATTENDANCE_TARGET;
+            j1.numberFormat = { type: "PERCENT", pattern: "0%" };
+
+            const i2 = newSheet.getCellByA1("I2");
+            i2.value = "Minimum Attendance";
+            const j2 = newSheet.getCellByA1("J2");
+            j2.value = ATTENDANCE_MINIMUM;
+            j2.numberFormat = { type: "PERCENT", pattern: "0%" };
+
+            const i3 = newSheet.getCellByA1("I3");
+            i3.value = "Total Meeting Hours";
+            const j3 = newSheet.getCellByA1("J3");
+            j3.value = maxHours;
+
+            const i4 = newSheet.getCellByA1("I4");
+            i4.value = "Total Man Hours";
+            const j4 = newSheet.getCellByA1("J4");
+            j4.formula = "=SUM(C2:C)";
+
+            await newSheet.loadCells(`B2:B${weekRows.length + 2}`);
+            for (let i = 0; i < weekRows.length; i++) {
+                const cell = newSheet.getCellByA1(`B${i + 2}`);
+                cell.numberFormat = { type: "DATE", pattern: "M/D/YYYY" };
+            }
+            await newSheet.saveUpdatedCells();
+
+            await doc.sheetsApi.post(
+                `https://sheets.googleapis.com/v4/spreadsheets/${doc.spreadsheetId}:batchUpdate`,
+                {
+                    requests: [
+                        gradientRule(
+                            newSheet.sheetId,
+                            {
+                                startRowIndex: 1,
+                                endRowIndex: i + 1,
+                                startColumnIndex: 6,
+                                endColumnIndex: 7,
+                            },
+                            {
+                                minpoint: {
+                                    color: {
+                                        red: 0.78,
+                                        green: 0,
+                                        blue: 0.22,
+                                    },
+                                    type: "NUMBER",
+                                    value: "0",
+                                },
+                                midpoint: {
+                                    color: {
+                                        red: 1,
+                                        green: 0.76,
+                                    },
+                                    type: "NUMBER",
+                                    value: `${ATTENDANCE_MINIMUM}`,
+                                },
+                                maxpoint: {
+                                    color: {
+                                        red: 0.18,
+                                        green: 0.8,
+                                        blue: 0.44,
+                                    },
+                                    type: "NUMBER",
+                                    value: `${ATTENDANCE_TARGET}`,
+                                },
+                            }
+                        ),
+                        updateDimension(newSheet.sheetId, "COLUMNS", 200, 0, 1),
+                        updateDimension(newSheet.sheetId, "COLUMNS", 200, 4, 6),
+                        updateDimension(newSheet.sheetId, "COLUMNS", 135, 8),
+                        updateDimension(newSheet.sheetId, "COLUMNS", 50, 9),
+                        basicFilterView(newSheet.sheetId, 0, 3, "Email"),
+                    ],
+                }
+            );
+
+            logger.debug("Attendance exported successfully");
+        } catch (err) {
+            logger.error(err);
+        }
     }
-});
+);

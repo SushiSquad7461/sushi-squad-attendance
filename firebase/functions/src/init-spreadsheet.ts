@@ -63,6 +63,7 @@ makeSpreadsheet().then(async (doc) => {
     console.log(
         `Please add the following to your .env file:\n\n\tGOOGLE_ATTENDANCE_AGGREGATE_SHEET_ID=${sheet.sheetId}`
     );
+    console.log("The headers should be [Email, Name, Hours, Attendance]");
 });
 
 // Uncomment this if you already have the spreadsheet

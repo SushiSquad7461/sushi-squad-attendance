@@ -54,6 +54,7 @@ const Attendances: Database<
         userId?: string;
         meetingId?: string;
         onOrAfter?: Date;
+        onOrBefore?: Date;
     }
 > = {
     async create({ user, meeting, description = undefined }) {
@@ -110,7 +111,7 @@ const Attendances: Database<
         return new Attendance(reponse as PageObjectResponse);
     },
 
-    async query({ userId, meetingId, onOrAfter }) {
+    async query({ userId, meetingId, onOrAfter, onOrBefore }) {
         const filters: PropertyFilter[] = [];
         if (userId) {
             filters.push({
@@ -143,6 +144,14 @@ const Attendances: Database<
                 property: "Date Created",
                 date: {
                     on_or_after: pacificDateStr(onOrAfter),
+                },
+            });
+        }
+        if (onOrBefore) {
+            filters.push({
+                property: "Date Created",
+                date: {
+                    on_or_before: pacificDateStr(onOrBefore),
                 },
             });
         }

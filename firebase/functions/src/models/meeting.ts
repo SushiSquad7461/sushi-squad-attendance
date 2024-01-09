@@ -27,7 +27,11 @@ class Meeting implements Model {
     }
 }
 
-const Meetings: Database<Meeting, { date: Date }, { onOrAfter: Date }> = {
+const Meetings: Database<
+    Meeting,
+    { date: Date },
+    { onOrAfter: Date; onOrBefore: Date }
+> = {
     async create({ date }) {
         const response = await NotionClient.createSimplePageInDatabase(
             process.env.NOTION_MEETINGS_DBID,
@@ -51,13 +55,19 @@ const Meetings: Database<Meeting, { date: Date }, { onOrAfter: Date }> = {
         return new Meeting(response as PageObjectResponse);
     },
 
-    async query({ onOrAfter }) {
+    async query({ onOrAfter, onOrBefore }) {
         const results = await NotionClient.queryAllDatabase(
             process.env.NOTION_MEETINGS_DBID,
             {
                 property: "Date",
                 date: {
                     on_or_after: pacificDateStr(onOrAfter),
+                },
+            },
+            {
+                property: "Date",
+                date: {
+                    on_or_before: pacificDateStr(onOrBefore),
                 },
             }
         );

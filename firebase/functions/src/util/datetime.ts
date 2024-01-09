@@ -3,6 +3,8 @@ export const minutesFromTime = (time: string): number => {
     return hours * 60 + minutes;
 };
 
+export const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Get the current date in the Pacific timezone as a string. Use
  * this for display purposes.

@@ -62,3 +62,31 @@ export function updateDimension(
         },
     };
 }
+
+export function basicFilterView(
+    sheetId: number,
+    startColumnIndex: number,
+    endColumnIndex: number,
+    sortColumnName: string,
+    sortOrder: "ASCENDING" | "DESCENDING" = "ASCENDING"
+) {
+    return {
+        setBasicFilter: {
+            filter: {
+                range: {
+                    sheetId,
+                    startColumnIndex,
+                    endColumnIndex,
+                },
+                sortSpecs: [
+                    {
+                        sortOrder,
+                        dataSourceColumnReference: {
+                            name: sortColumnName,
+                        },
+                    },
+                ],
+            },
+        },
+    };
+}
