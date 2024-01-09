@@ -3,6 +3,30 @@ export const minutesFromTime = (time: string): number => {
     return hours * 60 + minutes;
 };
 
+/** Days of the week and times that are valid meetings */
+export const validMeetingTimes = [
+    {
+        day: "Tuesday",
+        start: minutesFromTime("16:00"),
+        end: minutesFromTime("19:00"),
+    },
+    {
+        day: "Wednesday",
+        start: minutesFromTime("16:00"),
+        end: minutesFromTime("19:00"),
+    },
+    {
+        day: "Thursday",
+        start: minutesFromTime("16:00"),
+        end: minutesFromTime("19:00"),
+    },
+    {
+        day: "Saturday",
+        start: minutesFromTime("10:00"),
+        end: minutesFromTime("16:00"),
+    },
+];
+
 export const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
