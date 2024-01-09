@@ -186,7 +186,7 @@ const doc = new GoogleSpreadsheet(
 
 // AppEngine schedule syntax https://cloud.google.com/appengine/docs/flexible/scheduling-jobs-with-cron-yaml
 export const exportAttendance = onSchedule(
-    "every sunday 5:00 America/Los_Angeles",
+    "every sunday 5:00 PST",
     async () => {
         try {
             logger.debug("Exporting attendance");
