@@ -10,11 +10,23 @@ import Meetings, { getMeetingByDate } from "../models/meeting";
 const VALID_MEETING_TIME_EPSILON = 130; // minutes
 
 const logAttendanceHandler = async (request: CallableRequest) => {
-    const { email, description } = request.data;
+    const { email, tasks, description } = request.data;
     logger.debug(`Attendance log requested for email ${email}: ${description}`);
     // check if the email is valid
     if (!email || typeof email !== "string") {
         throw new HttpsError("invalid-argument", "No email");
+    }
+    if (description && typeof description !== "string") {
+        throw new HttpsError(
+            "invalid-argument",
+            "Description must be a string"
+        );
+    }
+    if (tasks && !Array.isArray(tasks)) {
+        throw new HttpsError(
+            "invalid-argument",
+            "Tasks must be an array of strings"
+        );
     }
     const trimmedEmail = email.trim();
     if (emailRegex.test(trimmedEmail) === false) {
@@ -29,6 +41,8 @@ const logAttendanceHandler = async (request: CallableRequest) => {
         );
     }
 
+    const parsedTasks: string[] =
+        tasks?.map((task: unknown) => new String(task).trim()) ?? [];
     const parsedDescription: string = (description as string)?.trim() ?? "";
 
     // check if the time is within the valid meeting time epsilon
@@ -95,6 +109,7 @@ const logAttendanceHandler = async (request: CallableRequest) => {
         await Attendances.create({
             user,
             meeting,
+            tasks: parsedTasks,
             description: parsedDescription,
         });
     } catch (err) {

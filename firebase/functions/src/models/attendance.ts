@@ -49,7 +49,7 @@ export type { Attendance };
 
 const Attendances: Database<
     Attendance,
-    { user: User; meeting: Meeting; description?: string },
+    { user: User; meeting: Meeting; tasks?: string[]; description?: string },
     {
         userId?: string;
         meetingId?: string;
@@ -57,7 +57,12 @@ const Attendances: Database<
         onOrBefore?: Date;
     }
 > = {
-    async create({ user, meeting, description = undefined }) {
+    async create({
+        user,
+        meeting,
+        tasks = undefined,
+        description = undefined,
+    }) {
         const children: BlockObjectRequest[] = [
             {
                 type: "paragraph",
@@ -66,16 +71,39 @@ const Attendances: Database<
                 ),
             },
         ];
-        if (description) {
+
+        children.push({
+            type: "heading_3",
+            heading_3: text("My tasks"),
+        });
+        children.push({
+            type: "paragraph",
+            paragraph: text("Fill this section out as you come in"),
+        });
+        if (tasks && tasks.length) {
+            for (const task of tasks) {
+                children.push({
+                    type: "to_do",
+                    to_do: { ...text(task), checked: false },
+                });
+            }
+        } else {
             children.push({
-                type: "heading_2",
-                heading_2: text("Description"),
-            });
-            children.push({
-                type: "paragraph",
-                paragraph: text(description),
+                to_do: { ...text(""), checked: false },
             });
         }
+
+        children.push({
+            type: "heading_3",
+            heading_3: text("My accomplishments"),
+        });
+        children.push({
+            type: "paragraph",
+            paragraph: text(
+                description ||
+                    "Fill this section out as you exit/at the beginning of the next meeting"
+            ),
+        });
 
         const reponse = await NotionClient.createSimplePageInDatabase(
             process.env.NOTION_ATTENDANCE_DBID,

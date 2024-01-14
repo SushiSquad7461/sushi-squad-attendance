@@ -77,7 +77,63 @@ const showToast = (message: string) => {
     }, 3500);
 };
 
+const tasksContainer = document.getElementById("tasks-container");
+const getTasks = (): HTMLCollectionOf<HTMLInputElement> => {
+    return (
+        tasksContainer?.getElementsByTagName("input") ??
+        (new HTMLCollection() as HTMLCollectionOf<HTMLInputElement>)
+    );
+};
+const popTask = () => {
+    if (!tasks.length) return;
+    tasksContainer?.removeChild(tasks[tasks.length - 1]);
+    tasks = getTasks();
+};
+let tasks = getTasks();
+const appendTask = () => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.classList.add(
+        "attendance-task",
+        "min-w-0",
+        "w-full",
+        "shrink",
+        "grow",
+        "rounded-md",
+        "px-2",
+        "border-2",
+        "border-gray-700"
+    );
+    input.placeholder = "Enter task";
+
+    const index = tasks.length;
+    input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            if (index === tasks.length - 1) {
+                appendTask();
+                tasks = getTasks();
+            }
+            tasks[index + 1].focus();
+        } else if (ev.key === "Backspace" && !input.value) {
+            const tasks = getTasks();
+            if (tasks.length > 1) {
+                tasksContainer?.removeChild(input);
+            }
+        }
+    });
+    tasksContainer?.appendChild(input);
+};
+
 const setupAttendanceForm = () => {
+    appendTask();
+
+    const removeTaskButton = document.getElementById("remove-task-button");
+    removeTaskButton?.addEventListener("click", popTask);
+
+    const addTaskButton = document.getElementById("add-task-button");
+    addTaskButton?.addEventListener("click", appendTask);
+
     const resultElement = document.getElementById(
         "attendance-error"
     ) as HTMLDivElement;
@@ -94,6 +150,12 @@ const setupAttendanceForm = () => {
         const description = (
             document.getElementById("attendance-desc") as HTMLInputElement
         ).value;
+        const tasks = [];
+        for (const task of getTasks()) {
+            if (task.value) {
+                tasks.push(task.value);
+            }
+        }
 
         console.debug("Submitting attendance for", email);
 
@@ -110,7 +172,7 @@ const setupAttendanceForm = () => {
         </path>
       </svg>
     </div>`;
-        logAttendance({ email, description })
+        logAttendance({ email, tasks, description })
             .then((result) => {
                 console.debug("Attendance logged, response: ", result);
                 showToast("Attendance logged!");

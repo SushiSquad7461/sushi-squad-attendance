@@ -20,7 +20,7 @@
 <body class="min-w-0 bg-white dark:bg-black/50">
   <main class="w-full flex items-center justify-center">
     <form action="" id="attendance-form"
-      class="max-w-[90%] flex transition-[height] bg-white/75 dark:bg-black/75 border-2 border-sushi-pink p-4 rounded-lg">
+      class="max-w-[90%] max-h-[95vh] overflow-scroll flex transition-[height] bg-white/75 dark:bg-black/75 border-2 border-sushi-pink p-4 rounded-lg">
       <fieldset class="w-72 md:w-96 min-w-0 flex flex-col align-center">
         <legend class="text-2xl px-1 mb-4">Log Attendance</legend>
 
@@ -30,12 +30,23 @@
             type="text" name="email" id="email" placeholder="Notion Email">
         </div>
 
-        <div class="mb-6 flex flex-col">
-          <label for="message" class="text-lg">Description</label>
-          <textarea id="attendance-desc" class="min-w-0 rounded-md p-2 border-2 border-gray-700" name="description"
-            id="message" rows="10" placeholder="What are you doing this meeting?"></textarea>
+        <div class="mb-6 flex flex-col gap-2 items-center">
+          <label for="name" class="text-lg self-start">Assigned Tasks (optional)</label>
+          <div id="tasks-container" class="w-full flex flex-col gap-2">
+          </div>
+          <div class="flex gap-2">
+            <button type="button" id="remove-task-button"
+              class="text-2xl w-16 h-6 flex items-center justify-center border-2 border-gray-700 rounded-[2rem]">-</button>
+            <button type="button" id="add-task-button"
+              class="text-2xl w-16 h-6 flex items-center justify-center border-2 border-gray-700 rounded-[2rem]">+</button>
+          </div>
         </div>
 
+        <div class="mb-6 flex flex-col">
+          <label for="message" class="text-lg">Accomplishments (optional)</label>
+          <textarea id="attendance-desc" class="min-w-0 rounded-md p-2 border-2 border-gray-700" name="description"
+            id="message" rows="5" placeholder="Fill out here or Notion post-meeting"></textarea>
+        </div>
 
         <button
           class="cursor-pointer hover:scale-110 motion-safe:active:scale-105 transition text-lg bg-white dark:bg-black border-2 border-sushi-blue rounded-[2rem] m-auto w-28 px-8 py-1 h-10 flex items-center justify-center"
@@ -46,6 +57,7 @@
           class="flex items-center justify-center transition-[height,transform,margin,opacity] opacity-0 mb-0 origin-top scale-y-0 duration-300 h-0 text-red-500 text-center font-bold text-lg"
           id="attendance-error">
         </div>
+        <div class="h6 w-1">&nbsp;</div>
       </fieldset>
     </form>
     </div>
