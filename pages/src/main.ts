@@ -209,7 +209,7 @@ const setupAttendanceForm = () => {
             })
             .finally(() => {
                 button.disabled = false;
-                button.innerHTML = "Send";
+                button.innerHTML = "Submit";
             });
 
         ev.stopPropagation();
