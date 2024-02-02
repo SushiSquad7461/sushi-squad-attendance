@@ -12,7 +12,7 @@ export const validMeetingTimes = [
     },
     {
         day: "Wednesday",
-        start: minutesFromTime("16:00"),
+        start: minutesFromTime("14:00"),
         end: minutesFromTime("19:00"),
     },
     {
